@@ -179,12 +179,10 @@ class SourCream implements \SessionHandlerInterface
     public function open( $savepath, $sessionname )
     {
         
-        if( $this->isSavePath() ){
-
-
-            
+        $this->savePath = $savePath;
+        if (!is_dir($this->savePath)) {
+            mkdir($this->savePath, 0777);
         }
-
         return true;
     }
 
