@@ -4,18 +4,35 @@ namespace SourCream;
 /**
  * Sour Cream
  */
-class SourCream
+class SourCream implements \SessionHandlerInterface
 {
     const CACHE_LIMIT_PUBLIC = "public";
     const CACHE_LIMIT_PRIVATE_NO_EXPIRE = "private_no_expire";
     const CACHE_LIMNT_NO_CACHE = "nocache";
 
+    private $isStarted = false;
+    private $config;
+
     /**
      * Sour Cream constructor
      */
-    public function __construct()
+    public function __construct( $config = array() )
     {
-        
+        $this->setConfig( $config );
+
+        if( !isset( $this->config["dontUseSelf"] ) ){
+            $this->setSaveHandlers( $this );
+        }  
+    }
+
+    public function setConfig( array $config )
+    {
+        $this->config = $config;
+    }
+
+    public function getConfig()
+    {
+        return $this->config;
     }
 
     public function saveSessionPath( string $path )
@@ -92,8 +109,13 @@ class SourCream
         return session_register( $string, $var );
     }
 
-    public function setSaveHandlers( mixed $open = null, string $close = "close", string $read = "read", string $write = "write", string $destroy = "destroy", string $garbage = "garbage", mixed $object = null )
+    public function setSaveHandlers( $open = null, string $close = "close", string $read = "read", string $write = "write", string $destroy = "destroy", string $garbage = "garbage", mixed $object = null )
     {
+
+        if( gettype( $open ) === "object" ){
+            $object = $open;
+        }
+
         if( is_array( $open ) && !empty( $open ) ){
 
             if( !isset( $open["open"] ) ){
@@ -115,7 +137,7 @@ class SourCream
                 throw new Error( "Specify a function to use for garbage" ); 
             }
 
-            return session_set_save_handler(
+            session_set_save_handler(
                 array( $open["object"], $open["open"] ),
                 array( $open["object"], $open["close"] ),
                 array( $open["object"], $open["read"] ),
@@ -125,15 +147,20 @@ class SourCream
             );
         }
 
-        if( $object instanceof SourCream\SourCream || class_exists( $object ) ){
-            return session_set_save_handler(
-                array( &$object, $open ),
-                array( &$object, $close ),
-                array( &$object, $read ),
-                array( &$object, $write ),
-                array( &$object, $destroy ),
-                array( &$object, $garbage )
+        if( $object instanceof SourCream\SourCream || class_exists( get_class( $object ) ) ){
+
+
+
+
+            session_set_save_handler( 
+                array( &$object, "open" ), 
+                array( &$object, $close ), 
+                array( &$object, $read ), 
+                array( &$object, $write ), 
+                array( &$object, $destroy ), 
+                array( &$object, $garbage ) 
             );
+
             // the following prevents unexpected effects when using objects as save handlers
             register_shutdown_function('session_write_close');
         }
@@ -151,37 +178,59 @@ class SourCream
 
     public function open( $savepath, $sessionname )
     {
+        
+        if( $this->isSavePath() ){
+
+
+            
+        }
+
         return true;
     }
 
     public function close()
     {
+        error_log( print_r( __METHOD__ .":".__LINE__,1 ) );
         return true;
     }
 
-    public function read()
+    public function read( $sessionId )
     {
-        
+        error_log( print_r( __METHOD__ .":".__LINE__,1 ) );
+        return $this->setSessionId( $sessionId );
     }
 
-    public function write()
+    public function write( $key, $value )
     {
-
+        error_log( print_r( __METHOD__ .":".__LINE__,1 ) );
+        return true;
     }
 
-    public function destroy()
+    public function destroy( $session_id )
     {
-        return session_destroy();
+        error_log( print_r( __METHOD__ .":".__LINE__,1 ) );
+        return session_destroy( $session_id );
     }
 
-    public function garbage()
+    public function garbage( $maxlifetime )
     {
+        error_log( print_r( __METHOD__ .":".__LINE__,1 ) );
+        true;
+    }
 
+    public function gc( $maxlifetime ){
+        error_log( print_r( __METHOD__ .":".__LINE__,1 ) );
+        return true;
     }
 
     public function garbageCleanup()
     {
         return session_gc();
+    }
+
+    public function isSavePath()
+    {
+        return (bool)isset( $this->config["savepath"] );
     }
 
     public function getCookieParams()
@@ -196,6 +245,12 @@ class SourCream
 
     public function start( array $options = array() )
     {
+
+        if( $this->isStarted ){
+            throw new Error( "Session has already been started" );
+        }
+
+        $this->isStarted = 1;
         return session_start( $options );
     }
 
